@@ -24,7 +24,10 @@
                     OkHttpClient
                     OkHttpClient$Builder
                     Request$Builder
-                    RequestBody)
+                    RequestBody
+                    ResponseBody
+                    Call
+                    Callback)
            (okhttp3.internal Util)
            (okio BufferedSink
                  Okio)
@@ -119,24 +122,36 @@
                                         (name method)))))]
     (.build ^Request$Builder req)))
 
+
 (defn fetch
   "Performs the request.
 
   If :as is passed as :stream, returns an InputStream.
+  If :async is passed as function it returns a okhttp3 call object which can be canced
+     and passes the response to the function
   If passed as :socket, returns the underlying UNIX socket for direct I/O."
-  [{:keys [conn as] :as args}]
+  [{:keys [conn as async] :as args}]
   (let [client   ^OkHttpClient (:client conn)
         request  (build-request (update args
                                         :url
                                         #(format "http://localhost%s" %)))
-        response (-> client
-                     (.newCall request)
-                     .execute
-                     .body)]
-    (case as
-      :socket (:socket conn)
-      :stream (.byteStream response)
-      (.string response))))
+        handle-response #(case as
+                           :socket (:socket conn)
+                           :stream (.byteStream ^ResponseBody %)
+                           (.string ^ResponseBody %))]
+    (if async
+      (let [call ^Call (.newCall client request)]
+        (.enqueue call (reify Callback
+                         (onResponse [this call response]
+                           (async (handle-response (.body response))))
+                         (onFailure [this call io-exception]
+                           (async io-exception))))
+        call)
+      (-> client
+          (.newCall request)
+          .execute
+          .body
+          handle-response))))
 
 (comment
   (unix-socket-client-builder "/var/run/docker.sock")

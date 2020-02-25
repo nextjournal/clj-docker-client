@@ -116,7 +116,7 @@
   :as specifying the result. Can be either of :stream, :socket, :data. Defaults to :data.
 
   If a :socket is requested, the underlying UNIX socket is returned."
-  [{:keys [category conn api-version]} {:keys [op params as]}]
+  [{:keys [category conn api-version]} {:keys [op params as async]}]
   (when (some nil? [category conn op])
     (panic! ":category, :conn are required in client, :op is required in operation map"))
   (let [request-info   (spec/request-info-of category op api-version)
@@ -130,6 +130,13 @@
                             (reduce (partial spec/gather-request-params
                                              params)
                                     {}))
+        handle-response #(try
+                           (case as
+                             (:socket :stream) %
+                             (json/read-value %
+                                              (json/object-mapper
+                                                {:decode-key-fn keyword})))
+                           (catch Exception _ %))
         response       (req/fetch {:conn   conn
                                    :url    (:path request-info)
                                    :method (:method request-info)
@@ -137,15 +144,9 @@
                                    :header header
                                    :body   (-> body vals first)
                                    :path   path
-                                   :as     as})
-        try-json-parse #(try
-                          (json/read-value %
-                                           (json/object-mapper
-                                            {:decode-key-fn keyword}))
-                          (catch Exception _ %))]
-    (case as
-      (:socket :stream) response
-      (try-json-parse response))))
+                                   :async  (when async #(async (handle-response %)))
+                                   :as     as})]
+    (handle-response response)))
 
 (comment
   (require '[clojure.java.io :as io])
@@ -229,6 +230,10 @@
   (doc containers :ContainerCreate)
 
   (invoke images {:op :ImageList})
+
+  (invoke images {:op :ImageList
+                  :async #(clojure.pprint/pprint %)
+                  :params {:digests true}})
 
   (def pinger (client {:category    :_ping
                        :conn        conn
