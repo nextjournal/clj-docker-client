@@ -14,10 +14,13 @@
 ;   along with clj-docker-client. If not, see <http://www.gnu.org/licenses/>.
 
 (ns clj-docker-client.core-test
-  (:require [clojure.test :refer :all]
-            [clojure.java.io :as io]
-            [clojure.core.async :as async]
-            [clj-docker-client.core :refer :all]))
+    (:require [clojure.test :refer :all]
+        [clojure.java.io :as io]
+        [clojure.core.async :as async]
+        [clojure.java.io :as io]
+        [clj-docker-client.core :refer :all]) (:import (java.io InputStream))
+    (:import (java.util Arrays)
+             (java.io IOException)))
 
 (def latest-version "v1.40")
 
@@ -151,5 +154,38 @@
                                 :params {:digests true}})
                        type
                        .getName)))
-            (is (int? (:Created(ffirst (async/alts!! [chan (async/timeout 3000)]))))))
+            (is (int? (:Created (ffirst (async/alts!! [chan (async/timeout 3000)]))))))
+          (finally (delete-image image)))))
+
+    (testing "cancel asynchronous op"
+      (let [events (client {:category :events :conn conn})
+            image  "busybox:musl"
+            chan   (async/chan)]
+        (try
+          (let [call (invoke events {:op :SystemEvents
+                                     :async (partial async/>!! chan)
+                                     :as :stream})]
+            (is (= "okhttp3.internal.connection.RealCall" (-> call type .getName)))
+            (pull-image image)
+            (let [stream (first (async/alts!! [chan (async/timeout 3000)]))
+                  buffer-size 150
+                  buffer (char-array buffer-size)]
+              (is (instance? InputStream stream))
+              (is (thrown? Exception
+                           (let [reader (io/reader stream)]
+                             ;; ensure a pull event is received
+                             (is (= buffer-size (.read reader buffer 0 buffer-size)))
+                             (is (.contains (String. (Arrays/copyOfRange buffer 0 buffer-size)) "pull"))
+                             ;; cancel asynchronous request
+                             (.cancel call)
+                             ;; read what is left until it fails or times out
+                             (when-let [exception
+                                        (first (async/alts!! [(async/timeout 3000)
+                                                              (async/thread
+                                                                (try
+                                                                  (while true (.read reader buffer 0 buffer-size))
+                                                                  (catch Exception e e)))]))]
+                               (throw exception)))))))
           (finally (delete-image image)))))))
+
+
