@@ -16,6 +16,7 @@
 (ns clj-docker-client.core-test
   (:require [clojure.test :refer :all]
             [clojure.java.io :as io]
+            [clojure.core.async :as async]
             [clj-docker-client.core :refer :all]))
 
 (def latest-version "v1.40")
@@ -133,4 +134,22 @@
                                                              io/file
                                                              io/input-stream)}})))
         (delete-container cname)
-        (delete-image image)))))
+        (delete-image image)))
+
+
+    (testing "invoke an op asynchronously"
+      (let [images (client {:category :images :conn conn})
+            image  "busybox:musl"
+            chan   (async/chan)]
+        (pull-image image)
+        (try
+          (do
+            (is (= "okhttp3.internal.connection.RealCall"
+                   (-> images
+                       (invoke {:op :ImageList
+                                :async (partial async/>!! chan)
+                                :params {:digests true}})
+                       type
+                       .getName)))
+            (is (int? (:Created(ffirst (async/alts!! [chan (async/timeout 3000)]))))))
+          (finally (delete-image image)))))))
