@@ -140,7 +140,7 @@
         (delete-image image)))
 
 
-    (testing "invoke an op asynchronously"
+    (testing "invoke an op asynchronously with callback function"
       (let [images (client {:category :images :conn conn})
             image  "busybox:musl"
             chan   (async/chan)]
@@ -156,6 +156,24 @@
                        .getName)))
             (is (int? (:Created (ffirst (async/alts!! [chan (async/timeout 3000)]))))))
           (finally (delete-image image)))))
+
+    (testing "invoke an op asynchronously and pass response to channel"
+       (let [images (client {:category :images :conn conn})
+             image  "busybox:musl"
+             chan   (async/chan)]
+         (pull-image image)
+         (try
+           (do
+             (is (= "okhttp3.internal.connection.RealCall"
+                    (-> images
+                        (invoke {:op :ImageList
+                                 :async-chan chan
+                                 :params {:digests true}})
+                        type
+                        .getName)))
+             (is (int? (:Created (ffirst (async/alts!! [chan (async/timeout 3000)]))))))
+           (finally (delete-image image)))))
+
 
     (testing "cancel asynchronous op"
       (let [events (client {:category :events :conn conn})

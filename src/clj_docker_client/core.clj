@@ -17,6 +17,7 @@
   (:require [clojure.string :as s]
             [jsonista.core :as json]
             [clj-docker-client.requests :as req]
+            [clojure.core.async :as async]
             [clj-docker-client.specs :as spec])
   (:import (java.time Duration)
            (java.net URI)
@@ -116,7 +117,7 @@
   :as specifying the result. Can be either of :stream, :socket, :data. Defaults to :data.
 
   If a :socket is requested, the underlying UNIX socket is returned."
-  [{:keys [category conn api-version]} {:keys [op params as async-fn]}]
+  [{:keys [category conn api-version]} {:keys [op params as async-fn async-chan]}]
   (when (some nil? [category conn op])
     (panic! ":category, :conn are required in client, :op is required in operation map"))
   (let [request-info   (spec/request-info-of category op api-version)
@@ -137,15 +138,18 @@
                                               (json/object-mapper
                                                 {:decode-key-fn keyword})))
                            (catch Exception _ %))
-        response       (req/fetch {:conn      conn
-                                   :url       (:path request-info)
-                                   :method    (:method request-info)
-                                   :query     query
-                                   :header    header
-                                   :body      (-> body vals first)
-                                   :path      path
-                                   :async-fn  (when async-fn #(async-fn (handle-response %)))
-                                   :as        as})]
+        response       (req/fetch {:conn       conn
+                                   :url        (:path request-info)
+                                   :method     (:method request-info)
+                                   :query      query
+                                   :header     header
+                                   :body       (-> body vals first)
+                                   :path       path
+                                   :async-fn   (when (or async-fn async-chan)
+                                                     #(do
+                                                        (when async-fn (async-fn (handle-response %)))
+                                                        (when async-chan (async/put! async-chan (handle-response %)))))
+                                   :as         as})]
     (handle-response response)))
 
 (comment

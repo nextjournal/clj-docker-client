@@ -23,18 +23,17 @@
                  [clj-commons/clj-yaml "0.7.0"]
                  [metosin/jsonista "0.2.5"]
                  [com.squareup.okhttp3/okhttp "4.4.0"]
+                 [org.clojure/core.async "1.0.567"]
                  [com.github.jnr/jnr-unixsocket "0.27"]]
   :plugins [[lein-ancient "0.6.15"]]
   :global-vars {*warn-on-reflection* true}
   :aot [clj-docker-client.socket.TunnelingUnixSocket
         clj-docker-client.socket.UnixDomainSocketFactory]
   :resource-paths ["resources"]
-  :profiles {:kaocha {:dependencies [[lambdaisland/kaocha "0.0-590"]
-                                     [org.clojure/core.async "1.0.567"]]}
+  :profiles {:kaocha {:dependencies [[lambdaisland/kaocha "0.0-590"]]}
              :rebl   {:repl-options   {:nrepl-middleware [nrebl.middleware/wrap-nrebl]}
                       :injections     [(require '[cognitect.rebl :as rebl])]
                       :dependencies   [[rickmoynihan/nrebl.middleware "0.3.1"]
-                                       [org.clojure/core.async "1.0.567"]
                                        [lein-cljfmt "0.6.6"]
                                        [org.openjfx/javafx-fxml "13.0.2"]
                                        [org.openjfx/javafx-controls "13.0.2"]
