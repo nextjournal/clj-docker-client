@@ -150,7 +150,7 @@
             (is (= "okhttp3.internal.connection.RealCall"
                    (-> images
                        (invoke {:op :ImageList
-                                :async (partial async/>!! chan)
+                                :async-fn (partial async/>!! chan)
                                 :params {:digests true}})
                        type
                        .getName)))
@@ -163,7 +163,7 @@
             chan   (async/chan)]
         (try
           (let [call (invoke events {:op :SystemEvents
-                                     :async (partial async/>!! chan)
+                                     :async-fn (partial async/>!! chan)
                                      :as :stream})]
             (is (= "okhttp3.internal.connection.RealCall" (-> call type .getName)))
             (pull-image image)

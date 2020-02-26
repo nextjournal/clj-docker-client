@@ -130,7 +130,7 @@
   If :async is passed as function it returns a okhttp3 call object which can be canced
      and passes the response to the function
   If passed as :socket, returns the underlying UNIX socket for direct I/O."
-  [{:keys [conn as async] :as args}]
+  [{:keys [conn as async-fn] :as args}]
   (let [client   ^OkHttpClient (:client conn)
         request  (build-request (update args
                                         :url
@@ -139,13 +139,13 @@
                            :socket (:socket conn)
                            :stream (.byteStream ^ResponseBody %)
                            (.string ^ResponseBody %))]
-    (if async
+    (if async-fn
       (let [call ^Call (.newCall client request)]
         (.enqueue call (reify Callback
                          (onResponse [this call response]
-                           (async (handle-response (.body response))))
+                           (async-fn (handle-response (.body response))))
                          (onFailure [this call io-exception]
-                           (async io-exception))))
+                           (async-fn io-exception))))
         call)
       (-> client
           (.newCall request)

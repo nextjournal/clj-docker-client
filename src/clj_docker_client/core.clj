@@ -116,7 +116,7 @@
   :as specifying the result. Can be either of :stream, :socket, :data. Defaults to :data.
 
   If a :socket is requested, the underlying UNIX socket is returned."
-  [{:keys [category conn api-version]} {:keys [op params as async]}]
+  [{:keys [category conn api-version]} {:keys [op params as async-fn]}]
   (when (some nil? [category conn op])
     (panic! ":category, :conn are required in client, :op is required in operation map"))
   (let [request-info   (spec/request-info-of category op api-version)
@@ -137,15 +137,15 @@
                                               (json/object-mapper
                                                 {:decode-key-fn keyword})))
                            (catch Exception _ %))
-        response       (req/fetch {:conn   conn
-                                   :url    (:path request-info)
-                                   :method (:method request-info)
-                                   :query  query
-                                   :header header
-                                   :body   (-> body vals first)
-                                   :path   path
-                                   :async  (when async #(async (handle-response %)))
-                                   :as     as})]
+        response       (req/fetch {:conn      conn
+                                   :url       (:path request-info)
+                                   :method    (:method request-info)
+                                   :query     query
+                                   :header    header
+                                   :body      (-> body vals first)
+                                   :path      path
+                                   :async-fn  (when async-fn #(async-fn (handle-response %)))
+                                   :as        as})]
     (handle-response response)))
 
 (comment
