@@ -148,7 +148,7 @@
                                    :async-fn   (when (or async-fn async-chan)
                                                      #(do
                                                         (when async-fn (async-fn (handle-response %)))
-                                                        (when async-chan (async/put! async-chan (handle-response %)))))
+                                                        (when async-chan (async/put! async-chan (or (handle-response %) {})))))
                                    :as         as})]
     (handle-response response)))
 
